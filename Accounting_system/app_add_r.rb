@@ -1,80 +1,78 @@
 require 'bundler/setup'
 Bundler.require
+require 'sqlite3'
 
-# Подключение к базе данных
-db = SQLite3::Database.new('people.db')
+# Connection to the database
+db = SQLite3::Database.new('board.db')
 
-# Создание таблицы "people" (если она еще не существует)
+# Creating the "board" table (if it doesn't exist)
 db.execute <<-SQL
-  CREATE TABLE IF NOT EXISTS people (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(255),
-    age INTEGER,
-    room_id INTEGER
-  );
-SQL
-
-# Создание таблицы "rooms" (если она еще не существует)
-db.execute <<-SQL
-  CREATE TABLE IF NOT EXISTS rooms (
+  CREATE TABLE IF NOT EXISTS board (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(255)
   );
 SQL
 
-def add_person(db)
-  puts "Введите имя человека:"
-  name = gets.chomp
-  puts "Введите возраст человека:"
-  age = gets.chomp.to_i
+def add_board(db)
+  puts "Enter a list of words separated by commas:"
+  names = gets.chomp.downcase.split(",").map(&:strip)
 
-  puts "Введите номер комнаты:"
-  room_number = gets.chomp.to_i
+  added_names = Set.new
+  existing_names = Set.new(db.execute("SELECT name FROM board").flatten.map(&:downcase))
 
-  # Вставка данных в таблицу "people"
-  db.execute("INSERT INTO people (name, age, room_id) VALUES (?, ?, ?)", [name, age, room_number])
+  names.each do |name|
+    next if added_names.include?(name) || existing_names.include?(name)
 
-  puts "#{name} успешно добавлен в базу данных и поселен в комнату #{room_number}."
+    db.execute("INSERT INTO board (name) VALUES (?)", name)
+    puts "#{name} has been successfully added to the database."
+    added_names << name
+  end
 end
 
-def remove_person(db)
-  puts "Введите имя человека, которого нужно удалить:"
-  name = gets.chomp
-
-  # Удаление человека из таблицы "people"
-  db.execute("DELETE FROM people WHERE name = ?", [name])
-
-  puts "#{name} успешно удален из базы данных."
+puts "--------------------------------------------------------------------------"
+def print_board(db)
+  puts "Word list:"
+  board = db.execute("SELECT name FROM board")
+  board.each_with_index { |row, index| puts "#{index + 1}. #{row[0]}" }
+	puts "--------------------------------------------------------------------------"
 end
 
-def print_people(db)
-  puts "Список людей:"
-  people = db.execute("SELECT people.name, people.age, rooms.name FROM people LEFT JOIN rooms ON people.room_id = rooms.id")
-  people.each { |person| puts "#{person[0]}, возраст #{person[1]}, комната #{person[2]}" }
-	
+def remove_duplicates(db)
+  db.execute("UPDATE board SET name = TRIM(name)")
+
+  db.execute <<-SQL
+    DELETE FROM board
+    WHERE id NOT IN (
+      SELECT MIN(id)
+      FROM board
+      GROUP BY LOWER(name)
+    )
+  SQL
+
+  puts "Duplicate words have been removed from the database."
 end
 
 
 
 loop do
-  puts "Выберите действие:"
-  puts "1. Добавить человека и поселить в комнату"
-  puts "2. Удалить человека"
-  puts "3. Вывести список людей"
-  puts "4. Выйти"
-
+  puts "Select an action:"
+  puts "1. Add words"
+  puts "2. Print word list"
+  puts "3. Remove duplicates"
+  puts "4. Exit"
+	puts "--------------------------------------------------------------------------"
   choice = gets.chomp.to_i
 
   case choice
   when 1
-    add_person(db)
+    add_board(db)
   when 2
-    remove_person(db)
+    print_board(db)
   when 3
-    print_people(db)
+    remove_duplicates(db)
   when 4
     break
   else
-    puts "Некорректный выбор. Попробуйте еще раз."
+    puts "Invalid choice. Please try again."
   end
 end
