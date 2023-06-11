@@ -37,16 +37,28 @@ end
 
 def print_people(db)
   puts "Список людей:"
+  puts "------------------------"
   people = db.execute("SELECT * FROM people")
-  people.each { |person| puts "#{person[1]}, возраст #{person[2]}" }
+  
+  if people.empty?
+    puts "Людей в списке нет."
+  else
+    people.each_with_index do |person, index|
+      puts "#{index + 1}. #{person[1]}, возраст #{person[2]}"
+    end
+  end
 end
+
+puts "------------------------="
 
 loop do
   puts "Выберите действие:"
+	puts "------------------------"
   puts "1. Добавить человека"
   puts "2. Удалить человека"
   puts "3. Вывести список людей"
   puts "4. Выйти"
+	puts "------------------------"
 
   choice = gets.chomp.to_i
 
